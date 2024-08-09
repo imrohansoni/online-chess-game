@@ -3,7 +3,11 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <color name="lightSquare">#D5ACFF</color>
-    <color name="darkSquare">#7F00FF</color>
-    <color name="selectedSquare">#37006F</color>
+<!--    <color name="lightSquare">#D5ACFF</color>-->
+<!--    <color name="darkSquare">#7F00FF</color>-->
+
+    <color name="lightSquare">#FFFCED</color>
+    <color name="darkSquare">#8BC34A</color>
+
+    <color name="selectedSquare">#00BCD4</color>
 </resources>
