@@ -5,28 +5,35 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 
-class Square(val row: Int, val col: Int) {
-    var isSelected = false
-    var chessPieceBitmap: Bitmap? = null
-    private val GAP = 40
+// File => column, Rank => row
+val files = arrayOf('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h')
+val ranks = arrayOf('8', '7', '6', '5', '4', '3', '2', '1')
 
-    fun draw(side: Int, canvas: Canvas, paint: Paint) {
-        val top = (row * side + GAP).toFloat()
+class Square(val row: Int, val col: Int, val side : Int) {
+    val algebraicNotation = "${files[col]}${ranks[row]}"
+
+    var isSelected = false
+    private val gap = 40
+
+    fun draw(canvas: Canvas, paint: Paint) {
+        val top = (row * side + gap).toFloat()
         val bottom = (top + side)
-        val left = (col * side + GAP).toFloat()
+        val left = (col * side + gap).toFloat()
         val right = (left + side)
 
         val selectedPaint = Paint().apply {
             color = Color.parseColor("#00BCD4")
         }
 
-        val finalPaint = if(isSelected) selectedPaint else paint
+        val finalPaint = if (isSelected) selectedPaint else paint
 
         canvas.drawRect(left, top, right, bottom, finalPaint)
+    }
 
-        chessPieceBitmap?.let {
-            canvas.drawBitmap(it, left, top, null)
-        }
+    fun drawPiece(canvas: Canvas, bitmap: Bitmap) {
+        val top = (row * side + gap).toFloat()
+        val left = (col * side + gap).toFloat()
+        canvas.drawBitmap(bitmap, left, top, null)
     }
 
 }
