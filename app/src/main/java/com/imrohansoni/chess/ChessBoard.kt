@@ -10,15 +10,18 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import com.imrohansoni.chess.models.Square
+import com.imrohansoni.chess.pieces.King
+import com.imrohansoni.chess.pieces.Pawn
 import com.imrohansoni.chess.utils.ChessBoardManager
 import com.imrohansoni.chess.utils.ChessPieceBitmapProvider
 
 
 class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
     View(context, attributeSet) {
-    // calculating the window width
+
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val displayMetrics = DisplayMetrics()
+
     private val width: Int = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val windowsMatrix = windowManager.currentWindowMetrics
         val bounds = windowsMatrix.bounds
@@ -29,7 +32,7 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
         windowManager.defaultDisplay.getMetrics(displayMetrics)
         displayMetrics.widthPixels
     }
-    // calculating the length of the side using screen width and gap
+
     private val gap = 40
     private val side = ((width - (gap * 2)) / 8)
     private val lightSquarePaint = Paint().apply {
@@ -42,54 +45,86 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
     private val piecesBitmap = ChessPieceBitmapProvider.getPieceBitmaps(context, side)
     private val chessBoardPieces = ChessBoardManager.initializeBoard()
     private var selectedSquare: Square? = null
+    private var possibleSquares: Array<Pair<Int, Int>>? = null
 
-    // creating 8*8 2d array for displaying 64 squares in chess board
     private val squares = Array(8) { row ->
         Array(8) { col ->
             Square(row, col, side)
         }
     }
 
-    private fun moveSelectedPiece(x: Float, y: Float): Boolean {
+    private fun moveSelectedPiece(x: Float, y: Float) {
+
         selectedSquare?.let {
             val (endRow, endCol) = getPiecePosition(x, y)
 
-            // getting row and col from previously selected square
             val startRow = selectedSquare!!.row
             val startCol = selectedSquare!!.col
 
-            // getting the piece using startRow and startCol
-            val piece = chessBoardPieces[startRow][startCol]
-            // removing the piece from the previous location
-            chessBoardPieces[startRow][startCol] = null
-            // adding the to the new location
-            chessBoardPieces[endRow][endCol] = piece
+            if (possibleSquares?.contains(Pair(endRow, endCol)) == true) {
 
-            invalidate()
-            return true
+                val piece = chessBoardPieces[startRow][startCol]
+                chessBoardPieces[startRow][startCol] = null
+                chessBoardPieces[endRow][endCol] = piece
+
+                it.isSelected = false
+
+                possibleSquares?.forEach { square ->
+                    squares[square.first][square.second].isPossible = false
+                }
+                if (piece is Pawn) {
+                    piece.moved = true
+                }
+
+                if (piece is King) {
+                    piece.moved = true
+                }
+
+                possibleSquares = null
+                selectedSquare = null
+
+                invalidate()
+            } else {
+                if (chessBoardPieces[endRow][endCol] != null) {
+                    selectSquare(x, y)
+                }
+            }
         }
-        return false
     }
 
     private fun getPiecePosition(x: Float, y: Float): Array<Int> {
-        val row = ((y - gap) / side).toInt()
-        val col = ((x - gap) / side).toInt()
+        val row = ((y - gap) / side).toInt().coerceIn(0, 7)
+        val col = ((x - gap) / side).toInt().coerceIn(0, 7)
         return arrayOf(row, col)
     }
 
     private fun selectSquare(x: Float, y: Float) {
-        // calculating the row and column number using coordinates
         val (row, col) = getPiecePosition(x, y)
+        if(row !in 0..7 || col !in 0..7) return
 
-        if (row in 0..7 && col in 0..7) {
-            squares[row][col].isSelected = true
+        val selectedSquare = squares[row][col]
 
-            if (chessBoardPieces[row][col] != null) {
-                selectedSquare = squares[row][col]
-            }
-            invalidate()
+        // Check if the square clicked is the same as the currently selected square
+        if (this.selectedSquare == selectedSquare ) {
+            return
+        } else {
+            // Deselect the previously selected square and reset possible moves
+            this.selectedSquare?.isSelected = false
+            possibleSquares?.forEach { squares[it.first][it.second].isPossible = false }
+
+            // Set the new selected square and calculate possible moves
+            this.selectedSquare = selectedSquare
+            selectedSquare.isSelected = true
+            possibleSquares =
+                chessBoardPieces[row][col]?.calculatePossibleMoves(row, col, chessBoardPieces)
+
+            possibleSquares?.forEach { squares[it.first][it.second].isPossible = true }
         }
+
+        // Redraw the board with the new selection
+        invalidate()
     }
+
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -101,10 +136,9 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
 
                 square.draw(canvas, paint)
                 val piece = chessBoardPieces[row][col]
-                // if there is a piece in this square call the drawPiece method on the square
 
                 piece?.let {
-                    val pieceBitmap = piecesBitmap[piece.FENChar]
+                    val pieceBitmap = piecesBitmap[piece.fen]
                     pieceBitmap?.let {
                         square.drawPiece(canvas, it)
                     }
@@ -117,18 +151,12 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
 
         when (event?.action) {
             MotionEvent.ACTION_DOWN -> {
+                val coords = getPiecePosition(event.x, event.y)
                 if (selectedSquare != null) {
-                    if (moveSelectedPiece(event.x, event.y)) {
-                        selectedSquare?.isSelected = false
-                        selectedSquare = null
-                    }
+                    moveSelectedPiece(event.x, event.y)
                 } else {
                     selectSquare(event.x, event.y)
                 }
-            }
-
-            MotionEvent.ACTION_MOVE -> {
-
             }
         }
 

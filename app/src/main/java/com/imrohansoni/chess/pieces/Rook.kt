@@ -3,21 +3,47 @@ package com.imrohansoni.chess.pieces
 import com.imrohansoni.chess.models.Piece
 import com.imrohansoni.chess.models.Type
 
-class Rook(private val type: Type) : IPiece {
-    private var moved: Boolean = false
+
+// TODO: handle castling
+class Rook(override val type: Type) : IPiece {
+    var moved: Boolean = false
 
     override val piece: Piece = Piece.ROOK
-    override val moves: Array<Pair<Int, Int>> = arrayOf()
-    override var FENChar: String = if (type == Type.LIGHT) "R" else "r"
+    override val moves: Array<Pair<Int, Int>> = arrayOf(
+        Pair(-1, 0), Pair(1, 0),
+        Pair(0, -1), Pair(0, 1)
+    )
+    override var fen: String = if (type == Type.LIGHT) "R" else "r"
 
-    override fun calculatePossibleMoves(row: Int, col: Int): Array<Pair<Int, Int>> {
-        return arrayOf(
-            Pair(-1, 0), Pair(1, 0),  // Up, Down
-            Pair(0, -1), Pair(0, 1) // Left, Right
-        )
-    }
+    override fun calculatePossibleMoves(
+        row: Int,
+        col: Int,
+        chessBoard: Array<Array<IPiece?>>
+    ): Array<Pair<Int, Int>> {
+        val possibleMoves = mutableListOf<Pair<Int, Int>>()
 
-    fun hasMoved(): Boolean {
-        return moved
+        moves.forEach {
+            var currentRow = row
+            var currentCol = col
+
+            while (true) {
+                currentRow += it.first
+                currentCol += it.second
+
+                if (currentRow !in 0..7 || currentCol !in 0..7) break
+
+                val targetPiece = chessBoard[currentRow][currentCol]
+
+                if (targetPiece == null) {
+                    possibleMoves.add(Pair(currentRow, currentCol))
+                } else {
+                    if (targetPiece.type != type) {
+                        possibleMoves.add(Pair(currentRow, currentCol))
+                    }
+                    break
+                }
+            }
+        }
+        return possibleMoves.toTypedArray()
     }
 }
