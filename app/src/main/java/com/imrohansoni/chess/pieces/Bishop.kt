@@ -10,7 +10,6 @@ class Bishop(override val type: Type) : IPiece {
         Pair(1, 1), Pair(-1, -1), Pair(-1, 1), Pair(1, -1)
     )
 
-
     override var fen: String = if (type == Type.LIGHT) "B" else "b"
 
     override fun calculatePossibleMoves(

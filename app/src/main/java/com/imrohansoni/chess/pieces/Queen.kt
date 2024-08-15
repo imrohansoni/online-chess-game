@@ -28,7 +28,7 @@ class Queen(override val type: Type) : IPiece {
 
                 if (currentRow !in 0..7 || currentCol !in 0..7) break
 
-                var targetSquare = chessBoard[currentRow][currentCol]
+                val targetSquare = chessBoard[currentRow][currentCol]
                 if (targetSquare == null) {
                     possibleMoves.add(Pair(currentRow, currentCol))
                 } else {

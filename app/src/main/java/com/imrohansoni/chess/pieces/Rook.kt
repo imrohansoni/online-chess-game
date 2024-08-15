@@ -4,7 +4,6 @@ import com.imrohansoni.chess.models.Piece
 import com.imrohansoni.chess.models.Type
 
 
-// TODO: handle castling
 class Rook(override val type: Type) : IPiece {
     var moved: Boolean = false
 
@@ -21,7 +20,12 @@ class Rook(override val type: Type) : IPiece {
         chessBoard: Array<Array<IPiece?>>
     ): Array<Pair<Int, Int>> {
         val possibleMoves = mutableListOf<Pair<Int, Int>>()
+        if (!moved) {
+            val k = if (type == Type.LIGHT) Pair(7, 4) else Pair(0, 4)
+            if (chessBoard[k.first][k.second] != null || chessBoard[k.first][k.second]?.piece == Piece.KING) {
 
+            }
+        }
         moves.forEach {
             var currentRow = row
             var currentCol = col
