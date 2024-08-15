@@ -1,5 +1,9 @@
 package com.imrohansoni.chess
 
+import android.animation.Animator
+import android.animation.Animator.AnimatorListener
+import android.animation.AnimatorSet
+import android.animation.ValueAnimator
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -9,7 +13,10 @@ import android.util.DisplayMetrics
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import com.imrohansoni.chess.models.Move
+import com.imrohansoni.chess.models.PieceView
 import com.imrohansoni.chess.models.Square
+import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.pieces.King
 import com.imrohansoni.chess.pieces.Pawn
 import com.imrohansoni.chess.utils.ChessBoardManager
@@ -18,6 +25,7 @@ import com.imrohansoni.chess.utils.ChessPieceBitmapProvider
 
 class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
     View(context, attributeSet) {
+    private val moves = mutableListOf<Move>()
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val displayMetrics = DisplayMetrics()
@@ -28,50 +36,140 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
         val width = bounds.width()
         width
     } else {
-        @Suppress("DEPRECATION")
-        windowManager.defaultDisplay.getMetrics(displayMetrics)
+        @Suppress("DEPRECATION") windowManager.defaultDisplay.getMetrics(displayMetrics)
         displayMetrics.widthPixels
     }
+    private var currentPlayerType = Type.LIGHT
 
-    private val gap = 40
-    private val side = ((width - (gap * 2)) / 8)
+    private val squareSize = width / 8
+
     private val lightSquarePaint = Paint().apply {
         color = context.getColor(R.color.lightSquare)
     }
+
     private val darkSquarePaint = Paint().apply {
         color = context.getColor(R.color.darkSquare)
     }
 
-    private val piecesBitmap = ChessPieceBitmapProvider.getPieceBitmaps(context, side)
-    private val chessBoardPieces = ChessBoardManager.initializeBoard()
-    private var selectedSquare: Square? = null
-    private var possibleSquares: Array<Pair<Int, Int>>? = null
+    private val pieceBitmaps = ChessPieceBitmapProvider.getPieceBitmaps(context, squareSize)
+    private val boardState = ChessBoardManager.initializeBoard()
+    private var currentlySelectedSquare: Square? = null
+    private var availableMoves: Array<Pair<Int, Int>>? = null
+    private val pieceViews = mutableListOf<PieceView>()
+
+    init {
+        initializePieceViews()
+    }
+
 
     private val squares = Array(8) { row ->
         Array(8) { col ->
-            Square(row, col, side)
+            Square(row, col, squareSize)
         }
+    }
+
+
+    private fun initializePieceViews() {
+        for (row in boardState.indices) {
+            for (col in boardState[row].indices) {
+                boardState[row][col]?.let { piece ->
+                    pieceBitmaps[piece.fen]?.let { bitmap ->
+                        val x = (squareSize * row).toFloat()
+                        val y = (squareSize * col).toFloat()
+                        val pieceView = PieceView(bitmap, row, col, x, y)
+                        pieceViews.add(pieceView)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun animatePiece(piece: PieceView, endRow: Int, endCol: Int) {
+        val startX = piece.x
+        val startY = piece.y
+
+        val endX = (squareSize * endRow).toFloat()
+        val endY = (squareSize * endCol).toFloat()
+
+        val animatorX = ValueAnimator.ofFloat(startX, endX)
+        val animatorY = ValueAnimator.ofFloat(startY, endY)
+
+
+        val animatorSet = AnimatorSet().apply {
+            playTogether(animatorX, animatorY)
+            duration = 200L
+        }
+
+        animatorX.addUpdateListener {
+            piece.x = it.animatedValue as Float
+            invalidate()
+        }
+
+        animatorY.addUpdateListener {
+            piece.y = it.animatedValue as Float
+            invalidate()
+        }
+
+        animatorSet.addListener(object : AnimatorListener {
+            override fun onAnimationStart(animation: Animator) {}
+            override fun onAnimationEnd(animation: Animator) {
+                piece.row = endRow
+                piece.col = endCol
+            }
+
+            override fun onAnimationCancel(animation: Animator) {}
+            override fun onAnimationRepeat(animation: Animator) {}
+        })
+
+        animatorSet.start()
     }
 
     private fun moveSelectedPiece(x: Float, y: Float) {
 
-        selectedSquare?.let {
+        currentlySelectedSquare?.let {
             val (endRow, endCol) = getPiecePosition(x, y)
 
-            val startRow = selectedSquare!!.row
-            val startCol = selectedSquare!!.col
+            val startRow = currentlySelectedSquare!!.row
+            val startCol = currentlySelectedSquare!!.col
 
-            if (possibleSquares?.contains(Pair(endRow, endCol)) == true) {
+            if (availableMoves?.contains(Pair(endRow, endCol)) == true) {
+                val canMove =
+                    boardState[startRow][startCol].let { piece -> piece?.type == currentPlayerType }
+                if (!canMove) {
+                    return selectSquare(x, y)
+                }
 
-                val piece = chessBoardPieces[startRow][startCol]
-                chessBoardPieces[startRow][startCol] = null
-                chessBoardPieces[endRow][endCol] = piece
+                val pieceView = pieceViews.find { p ->
+                    p.row == startRow && p.col == startCol
+                }
+
+                val capturedPieceView = pieceViews.find { p ->
+                    p.row == endRow && p.col == endCol
+                }
+
+                pieceView?.let {
+                    animatePiece(pieceView, endRow, endCol)
+                    pieceView.row = endRow
+                    pieceView.col = endCol
+                }
+
+                if (capturedPieceView != null) {
+                    pieceViews.remove(capturedPieceView)
+                }
+
+                val piece = boardState[startRow][startCol]
+                boardState[startRow][startCol] = null
+                boardState[endRow][endCol] = piece
+
 
                 it.isSelected = false
 
-                possibleSquares?.forEach { square ->
-                    squares[square.first][square.second].isPossible = false
-                }
+                resetSquareFlags()
+                resetMovedFlags()
+                squares[startRow][startCol].movedSquare = true
+                squares[endRow][endCol].movedSquare = true
+
+
                 if (piece is Pawn) {
                     piece.moved = true
                 }
@@ -80,12 +178,25 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
                     piece.moved = true
                 }
 
-                possibleSquares = null
-                selectedSquare = null
+                currentPlayerType = if (currentPlayerType == Type.LIGHT) Type.DARK else Type.LIGHT
+
+                availableMoves = null
+                currentlySelectedSquare = null
+
+                moves.add(
+                    Move(
+                        piece!!.piece,
+                        currentPlayerType,
+                        startRow = startRow,
+                        startCol,
+                        endRow,
+                        endCol
+                    )
+                )
 
                 invalidate()
             } else {
-                if (chessBoardPieces[endRow][endCol] != null) {
+                if (boardState[endRow][endCol] != null) {
                     selectSquare(x, y)
                 }
             }
@@ -93,38 +204,62 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
     }
 
     private fun getPiecePosition(x: Float, y: Float): Array<Int> {
-        val row = ((y - gap) / side).toInt().coerceIn(0, 7)
-        val col = ((x - gap) / side).toInt().coerceIn(0, 7)
+        val row = (y / squareSize).toInt().coerceIn(0, 7)
+        val col = (x / squareSize).toInt().coerceIn(0, 7)
         return arrayOf(row, col)
+    }
+
+    private fun resetMovedFlags() {
+        for (row in squares.indices) {
+            for (col in squares[row].indices) {
+                squares[row][col].movedSquare = false
+            }
+        }
+    }
+
+    private fun resetSquareFlags() {
+        for (row in squares.indices) {
+            for (col in squares[row].indices) {
+                squares[row][col].isAvailable = false
+                squares[row][col].canBeCaptured = false
+            }
+        }
     }
 
     private fun selectSquare(x: Float, y: Float) {
         val (row, col) = getPiecePosition(x, y)
-        if(row !in 0..7 || col !in 0..7) return
+
+        if (row !in 0..7 || col !in 0..7) return
+
+        if (boardState[row][col] == null) {
+            return
+        }
 
         val selectedSquare = squares[row][col]
 
-        // Check if the square clicked is the same as the currently selected square
-        if (this.selectedSquare == selectedSquare ) {
+        if (this.currentlySelectedSquare == selectedSquare) {
             return
-        } else {
-            // Deselect the previously selected square and reset possible moves
-            this.selectedSquare?.isSelected = false
-            possibleSquares?.forEach { squares[it.first][it.second].isPossible = false }
-
-            // Set the new selected square and calculate possible moves
-            this.selectedSquare = selectedSquare
-            selectedSquare.isSelected = true
-            possibleSquares =
-                chessBoardPieces[row][col]?.calculatePossibleMoves(row, col, chessBoardPieces)
-
-            possibleSquares?.forEach { squares[it.first][it.second].isPossible = true }
         }
 
-        // Redraw the board with the new selection
+        this.currentlySelectedSquare?.isSelected = false
+
+        resetSquareFlags()
+
+        this.currentlySelectedSquare = selectedSquare
+        currentlySelectedSquare?.isSelected = true
+
+        availableMoves =
+            boardState[row][col]?.calculatePossibleMoves(row, col, boardState)
+
+        availableMoves?.forEach {
+            squares[it.first][it.second].isAvailable = true
+            if (boardState[it.first][it.second] != null) {
+                squares[it.first][it.second].canBeCaptured = true
+            }
+        }
+
         invalidate()
     }
-
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -135,14 +270,13 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
                 val square = squares[row][col]
 
                 square.draw(canvas, paint)
-                val piece = chessBoardPieces[row][col]
+            }
 
-                piece?.let {
-                    val pieceBitmap = piecesBitmap[piece.fen]
-                    pieceBitmap?.let {
-                        square.drawPiece(canvas, it)
-                    }
-                }
+        }
+
+        pieceViews.forEach {
+            if (!it.isCaptured) {
+                canvas.drawBitmap(it.bitmap, it.y, it.x, null)
             }
         }
     }
@@ -151,12 +285,18 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
 
         when (event?.action) {
             MotionEvent.ACTION_DOWN -> {
-                val coords = getPiecePosition(event.x, event.y)
-                if (selectedSquare != null) {
+                if (currentlySelectedSquare != null) {
                     moveSelectedPiece(event.x, event.y)
                 } else {
                     selectSquare(event.x, event.y)
                 }
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+            }
+
+            MotionEvent.ACTION_UP -> {
+
             }
         }
 
@@ -165,5 +305,21 @@ class ChessBoard(private val context: Context, attributeSet: AttributeSet?) :
 
     override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec)
+    }
+
+    fun moveToFirstMove() {
+        TODO("Not yet implemented")
+    }
+
+    fun moveToLastMove() {
+        TODO("Not yet implemented")
+    }
+
+    fun moveToPreviousMove() {
+        TODO("Not yet implemented")
+    }
+
+    fun moveToNextMove() {
+        TODO("Not yet implemented")
     }
 }
