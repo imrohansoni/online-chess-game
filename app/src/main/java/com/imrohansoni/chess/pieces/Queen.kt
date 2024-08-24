@@ -1,44 +1,47 @@
 package com.imrohansoni.chess.pieces
 
 import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.models.Type
+import com.imrohansoni.chess.utils.Constants.boardRange
 
-class Queen(override val type: Type) : IPiece {
-    override val piece: Piece = Piece.QUEEN
-    override val moves: Array<Pair<Int, Int>> = arrayOf(
+class Queen(override val type: Type) : ChessPiece {
+    override val piece = Piece.QUEEN
+    override val directions = arrayOf(
         Pair(1, 1), Pair(-1, -1),
         Pair(-1, 1), Pair(1, -1),
         Pair(-1, 0), Pair(1, 0),
         Pair(0, -1), Pair(0, 1)
     )
-    override var fen: String = if (type == Type.LIGHT) "Q" else "q"
+
+    override var fen = if (type == Type.LIGHT) "Q" else "q"
     override fun calculatePossibleMoves(
-        row: Int,
-        col: Int,
-        chessBoard: Array<Array<IPiece?>>
-    ): Array<Pair<Int, Int>> {
-        val possibleMoves = mutableListOf<Pair<Int, Int>>()
-        moves.forEach {
-            var currentRow = row
-            var currentCol = col
+        currentPosition: Position,
+        boardState : BoardState
+    ): Array<Position> {
+        val availableSquares = mutableListOf<Position>()
+
+        directions.forEach {
+            var row = currentPosition.row
+            var col = currentPosition.col
 
             while (true) {
-                currentRow += it.first
-                currentCol += it.second
+                row += it.first
+                col += it.second
 
-                if (currentRow !in 0..7 || currentCol !in 0..7) break
+                if (row !in boardRange || col !in boardRange) break
 
-                val targetSquare = chessBoard[currentRow][currentCol]
-                if (targetSquare == null) {
-                    possibleMoves.add(Pair(currentRow, currentCol))
+                val targetPiece = boardState[row][col]
+                if (targetPiece == null) {
+                        availableSquares.add(Position(row, col))
                 } else {
-                    if (targetSquare.type != type) {
-                        possibleMoves.add(Pair(currentRow, currentCol))
+                    if (targetPiece.type != type) {
+                            availableSquares.add(Position(row, col))
                     }
                     break
                 }
             }
         }
-        return possibleMoves.toTypedArray()
+        return availableSquares.toTypedArray()
     }
 }

@@ -1,45 +1,49 @@
 package com.imrohansoni.chess.pieces
 
 import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.models.Type
+import com.imrohansoni.chess.utils.Constants.boardRange
 
 
-class Bishop(override val type: Type) : IPiece {
-    override val piece: Piece = Piece.BISHOP
-    override val moves: Array<Pair<Int, Int>> = arrayOf(
+class Bishop(override val type: Type) : ChessPiece {
+    override val piece = Piece.BISHOP
+    override val directions = arrayOf(
         Pair(1, 1), Pair(-1, -1), Pair(-1, 1), Pair(1, -1)
     )
 
-    override var fen: String = if (type == Type.LIGHT) "B" else "b"
+    override var fen = if (type == Type.LIGHT) "B" else "b"
 
     override fun calculatePossibleMoves(
-        row: Int,
-        col: Int,
-        chessBoard: Array<Array<IPiece?>>
-    ): Array<Pair<Int, Int>> {
-        val possibleMoves = mutableListOf<Pair<Int, Int>>()
-        moves.forEach {
-            var currentRow = row
-            var currentCol = col
+        currentPosition: Position,
+        boardState: BoardState
+    ): Array<Position> {
+
+        val availableSquares = mutableListOf<Position>()
+
+        directions.forEach {
+            var row = currentPosition.row
+            var col = currentPosition.col
 
             while (true) {
-                currentRow += it.first
-                currentCol += it.second
+                row += it.first
+                col += it.second
 
-                if (currentRow !in 0..7 || currentCol !in 0..7) break
+                if (row !in boardRange || col !in boardRange) break
 
-                val targetPiece = chessBoard[currentRow][currentCol]
+                val targetPiece = boardState[row][col]
 
                 if (targetPiece == null) {
-                    possibleMoves.add(Pair(currentRow, currentCol))
+                    availableSquares.add(Position(row, col))
                 } else {
                     if (targetPiece.type != type) {
-                        possibleMoves.add(Pair(currentRow, currentCol))
+                        availableSquares.add(Position(row, col))
                     }
                     break
                 }
             }
         }
-        return possibleMoves.toTypedArray()
+
+        return availableSquares.toTypedArray()
     }
 }
