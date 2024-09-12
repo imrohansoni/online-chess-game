@@ -1,20 +1,20 @@
 package com.imrohansoni.chess.pieces
 
-import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.PieceType
 import com.imrohansoni.chess.models.Position
-import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.utils.Constants.boardRange
 
 
-class Knight(override val type: Type) : ChessPiece {
-    override val piece = Piece.KNIGHT
+class Knight(override val color: Color) : Piece {
+    override val pieceType = PieceType.KNIGHT
 
     override val directions = arrayOf(
         Pair(-2, -1), Pair(-1, -2), Pair(-2, 1), Pair(-1, 2),
         Pair(2, -1), Pair(1, -2), Pair(2, 1), Pair(1, 2)
     )
 
-    override var fen = if (type == Type.LIGHT) "N" else "n"
+    override var fen = if (color == Color.LIGHT) "N" else "n"
 
 
     override fun calculatePossibleMoves(
@@ -28,7 +28,7 @@ class Knight(override val type: Type) : ChessPiece {
 
             if (row in boardRange && col in boardRange) {
                 val targetPiece = boardState[row][col]
-                if (targetPiece == null || targetPiece.type != type
+                if (targetPiece == null || targetPiece.color != color
                 ) {
                     availableSquares.add(Position(row, col))
                 }

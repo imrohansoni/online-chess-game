@@ -1,26 +1,25 @@
 package com.imrohansoni.chess.pieces
 
-import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.PieceType
 import com.imrohansoni.chess.models.Position
-import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.utils.ChessBoardManager
 import com.imrohansoni.chess.utils.Constants.boardRange
 
-typealias BoardState = Array<Array<ChessPiece?>>
 
-class Pawn(override val type: Type) : ChessPiece {
+class Pawn(override val color: Color) : Piece {
     var moved = false
-    override val piece = Piece.PAWN
+    override val pieceType = PieceType.PAWN
     override val directions = when {
-        type == Type.LIGHT && ChessBoardManager.playerType == Type.LIGHT -> {
+        color == Color.LIGHT && ChessBoardManager.primaryPlayerColor == Color.LIGHT -> {
             arrayOf(Pair(-1, 0), Pair(-2, 0), Pair(-1, -1), Pair(-1, 1))
         }
 
-        type == Type.LIGHT && ChessBoardManager.playerType == Type.DARK -> {
+        color == Color.LIGHT && ChessBoardManager.primaryPlayerColor == Color.DARK -> {
             arrayOf(Pair(1, 0), Pair(2, 0), Pair(1, -1), Pair(1, 1))
         }
 
-        type == Type.DARK && ChessBoardManager.playerType == Type.LIGHT -> {
+        color == Color.DARK && ChessBoardManager.primaryPlayerColor == Color.LIGHT -> {
             arrayOf(Pair(1, 0), Pair(2, 0), Pair(1, -1), Pair(1, 1))
         }
 
@@ -28,7 +27,7 @@ class Pawn(override val type: Type) : ChessPiece {
             arrayOf(Pair(-1, 0), Pair(-2, 0), Pair(-1, -1), Pair(-1, 1))
         }
     }
-    override var fen = if (type == Type.LIGHT) "P" else "p"
+    override var fen = if (color == Color.LIGHT) "P" else "p"
 
     override fun calculatePossibleMoves(
         currentPosition: Position, boardState: BoardState
@@ -63,7 +62,7 @@ class Pawn(override val type: Type) : ChessPiece {
         if (row3 in boardRange && col3 in boardRange) {
             val position3 = Position(row3, col3)
             boardState[row3][col3]?.let {
-                if (it.type != type) {
+                if (it.color != color) {
                     availableSquares.add(position3)
                 }
             }
@@ -75,7 +74,7 @@ class Pawn(override val type: Type) : ChessPiece {
         if (row4 in boardRange && col4 in boardRange) {
             val position4 = Position(row4, col4)
             boardState[row4][col4]?.let {
-                if (it.type != type) {
+                if (it.color != color) {
                     availableSquares.add(position4)
                 }
             }

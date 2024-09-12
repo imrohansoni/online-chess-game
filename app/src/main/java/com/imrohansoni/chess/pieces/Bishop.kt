@@ -1,19 +1,17 @@
 package com.imrohansoni.chess.pieces
 
-import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.PieceType
 import com.imrohansoni.chess.models.Position
-import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.utils.Constants.boardRange
 
 
-class Bishop(override val type: Type) : ChessPiece {
-    override val piece = Piece.BISHOP
+class Bishop(override val color: Color) : Piece {
+    override val pieceType = PieceType.BISHOP
     override val directions = arrayOf(
         Pair(1, 1), Pair(-1, -1), Pair(-1, 1), Pair(1, -1)
     )
-
-    override var fen = if (type == Type.LIGHT) "B" else "b"
-
+    override var fen = if (color == Color.LIGHT) "B" else "b"
     override fun calculatePossibleMoves(
         currentPosition: Position,
         boardState: BoardState
@@ -36,7 +34,7 @@ class Bishop(override val type: Type) : ChessPiece {
                 if (targetPiece == null) {
                     availableSquares.add(Position(row, col))
                 } else {
-                    if (targetPiece.type != type) {
+                    if (targetPiece.color != color) {
                         availableSquares.add(Position(row, col))
                     }
                     break

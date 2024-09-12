@@ -1,20 +1,20 @@
 package com.imrohansoni.chess.pieces
 
-import com.imrohansoni.chess.models.Piece
+import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.PieceType
 import com.imrohansoni.chess.models.Position
-import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.utils.Constants.boardRange
 
 
-class Rook(override val type: Type) : ChessPiece {
+class Rook(override val color: Color) : Piece {
     var moved = false
 
-    override val piece = Piece.ROOK
+    override val pieceType = PieceType.ROOK
     override val directions = arrayOf(
         Pair(-1, 0), Pair(1, 0),
         Pair(0, -1), Pair(0, 1)
     )
-    override var fen = if (type == Type.LIGHT) "R" else "r"
+    override var fen = if (color == Color.LIGHT) "R" else "r"
 
     override fun calculatePossibleMoves(
         currentPosition: Position,
@@ -38,7 +38,7 @@ class Rook(override val type: Type) : ChessPiece {
                     availableSquares.add(Position(row, col))
 
                 } else {
-                    if (targetPiece.type != type) {
+                    if (targetPiece.color != color) {
                         availableSquares.add(Position(row, col))
                     }
                     break
