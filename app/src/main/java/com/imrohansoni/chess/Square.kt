@@ -1,9 +1,9 @@
-package com.imrohansoni.chess.models
+package com.imrohansoni.chess
 
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
-import com.imrohansoni.chess.R
+import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.utils.ChessBoardManager
 
 
@@ -72,27 +72,21 @@ class Square(
             if ((row + col) % 2 == 0) lightSquarePaint else darkSquarePaint
         canvas.drawRect(left, top, right, bottom, basePaint)
 
-
-
-        when {
-            isSelected -> canvas.drawRect(left, top, right, bottom, selectedSquarePaint)
-            isAvailable && lastMove -> {
-                canvas.drawRect(left, top, right, bottom, lastMoveSquarePaint)
-                canvas.drawCircle(centerX(), centerY(), 30f, availableSquarePaint)
-            }
-
-            lastMove -> canvas.drawRect(left, top, right, bottom, lastMoveSquarePaint)
-            isChecked -> canvas.drawRect(left, top, right, bottom, checkedPaint)
-            isAvailable -> canvas.drawCircle(centerX(), centerY(), 30f, availableSquarePaint)
-
+        if (isSelected) {
+            canvas.drawRect(left, top, right, bottom, selectedSquarePaint)
+        } else if (isChecked) {
+            canvas.drawRect(left, top, right, bottom, checkedPaint)
+        } else if (lastMove) {
+            canvas.drawRect(left, top, right, bottom, lastMoveSquarePaint)
         }
 
         if (canBeCaptured) {
             val ringRadius = squareSize / 2.2f
             canvas.drawCircle(centerX(), centerY(), ringRadius, canBeCapturedSquarePaint)
+        } else if (isAvailable) {
+            canvas.drawCircle(centerX(), centerY(), 30f, availableSquarePaint)
         }
     }
-
 
     private fun centerX(): Float {
         return (col * squareSize + squareSize / 2).toFloat()
