@@ -3,28 +3,24 @@ package com.imrohansoni.chess
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Paint
-import android.graphics.Typeface
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
 import com.imrohansoni.chess.adapters.CapturedPiece
 import com.imrohansoni.chess.models.Move
 import com.imrohansoni.chess.utils.CanvasInvalidator
+import com.imrohansoni.chess.utils.ChessBoardManager
 import com.imrohansoni.chess.utils.SquareManager
 
-class ChessBoardView(context: Context, attributeSet: AttributeSet?) :
+class ChessComponentView(context: Context, attributeSet: AttributeSet?) :
     View(context, attributeSet), CanvasInvalidator {
-    val controller: ChessBoardController = ChessBoardController(context, this)
 
-    private var onPieceMoveHandler: ((Move) -> Unit)? = null
-    private var onPieceCaptureHandler: ((CapturedPiece) -> Unit)? = null
+    private val controller = ChessBoardController(context, this)
+    private val squareManager = SquareManager(context)
+    private val chessBoardManger = ChessBoardManager()
 
-    private val paint = Paint().apply {
-        color = context.getColor(R.color.notation)
-        textSize = 30f // Adjust the text size as needed
-        typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-    }
+    private var onPieceMove: ((Move) -> Unit)? = null
+    private var onPieceCapture: ((CapturedPiece) -> Unit)? = null
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -37,31 +33,43 @@ class ChessBoardView(context: Context, attributeSet: AttributeSet?) :
         }
     }
 
-    override fun onTouchEvent(event: MotionEvent?): Boolean {
+    private fun handleTouchEvent(x: Float, y: Float) {
+        val position = squareManager.getSquarePosition(x, y)
 
-        when (event?.action) {
-            MotionEvent.ACTION_DOWN -> {
-                if (controller.currentlySelectedSquare != null) {
-                    val move = controller.moveSelectedPiece(event.x, event.y)
-                    move?.let {
-                        onPieceMoveHandler?.invoke(it)
+        if (GameState.selectedSquarePosition == position) return
 
-                        if (it.capturePiece != null) {
-                            onPieceCaptureHandler?.invoke(
-                                CapturedPiece(
-                                    it.capturePiece.bitmap,
-                                    it.capturedPieceType
-                                )
-                            )
-                        }
+        val piece = chessBoardManger.getPiece(position)
+
+        GameState.selectedSquarePosition?.let { selectedPosition ->
+            if (controller.canMovePiece() && GameState.safeSquares.contains(position)) {
+                controller.movePiece(selectedPosition, position)?.let { move ->
+                    onPieceMove?.invoke(move)
+                    if (move.capturePiece != null) {
+                        onPieceCapture?.invoke(
+                            CapturedPiece(move.capturePiece.bitmap, move.capturedPieceColor)
+                        )
                     }
-
-                } else {
-                    controller.selectSquare(event.x, event.y)
                 }
+                return
             }
+
+            if (piece?.color != GameState.currentPlayerColor) {
+                controller.resetSelection()
+            } else {
+                controller.selectSquare(position)
+            }
+            return
         }
 
+        controller.selectSquare(position)
+    }
+
+    override fun onTouchEvent(event: MotionEvent?): Boolean {
+        when (event?.action) {
+            MotionEvent.ACTION_DOWN -> {
+                handleTouchEvent(event.x, event.y)
+            }
+        }
         return true
     }
 
@@ -70,11 +78,11 @@ class ChessBoardView(context: Context, attributeSet: AttributeSet?) :
     }
 
     fun setOnPieceMoveHandler(callback: (Move) -> Unit) {
-        onPieceMoveHandler = callback
+        onPieceMove = callback
     }
 
     fun setOnPieceCaptureHandler(callback: (CapturedPiece) -> Unit) {
-        onPieceCaptureHandler = callback
+        onPieceCapture = callback
     }
 
     override fun canvasInvalidator() {
