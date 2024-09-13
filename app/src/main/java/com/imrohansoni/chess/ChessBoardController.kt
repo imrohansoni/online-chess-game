@@ -266,6 +266,11 @@ class ChessBoardController(
 
         if (currentPiece is Pawn) {
             if (!currentPiece.moved) currentPiece.moved = true
+            if (currentPosition.col != finalPosition.col && capturedPieceView == null) {
+                val captureEnPassantPosition = Position(currentPosition.row, finalPosition.col)
+                pieceViews.removeIf { pieceViews -> pieceViews.currentPosition == captureEnPassantPosition }
+                boardManager.setPiece(captureEnPassantPosition, null)
+            }
         }
 
         if (currentPiece is King) {
@@ -409,6 +414,12 @@ class ChessBoardController(
 
         if (selectedPiece is Pawn) {
             if (selectedPiece.moved) selectedPiece.moved = false
+
+            val enPassantPosition = canCaptureEnPassant(selectedPiece, position)
+            enPassantPosition?.let {
+                possibleSquares.add(it)
+                squareManager.addSquare(it, canBeCaptured = true)
+            }
         }
 
         GameState.safeSquares = possibleSquares
@@ -421,6 +432,33 @@ class ChessBoardController(
         }
 
         invalidator.canvasInvalidator()
+    }
+
+    private fun canCaptureEnPassant(
+        pawn: Piece,
+        pawnPosition: Position
+    ): Position? {
+        if (GameState.undoStack.isEmpty()) return null
+        val lastMove = GameState.undoStack.last()
+
+        if (pawn is Pawn && lastMove.piece is Pawn && lastMove.piece.color != pawn.color) {
+            if (abs(lastMove.startingPosition.row - lastMove.finalPosition.row) == 2 && abs(
+                    pawnPosition.col - lastMove.finalPosition.col
+                ) == 1 && pawnPosition.row == lastMove.finalPosition.row
+            ) {
+                val row = if (ChessBoardManager.primaryPlayerColor == Color.LIGHT) {
+                    if (pawn.color == Color.LIGHT) -1 else 1
+                } else {
+                    if (pawn.color == Color.LIGHT) 1 else -1
+                }
+                val capturePosition = Position(pawnPosition.row + row, lastMove.finalPosition.col)
+                if (boardManager.getPiece(capturePosition) != null) return null
+                if (isSafeSquare(pawnPosition, capturePosition)) {
+                    return capturePosition
+                }
+            }
+        }
+        return null
     }
 
 
