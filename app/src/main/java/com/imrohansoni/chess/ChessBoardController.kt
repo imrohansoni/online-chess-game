@@ -77,16 +77,25 @@ class ChessBoardController(
         chessBoardManager.setPiece(finalPosition, piece)
     }
 
-    private fun performCastle(king: King, rookStartingSquare: String, rookFinalSquare: String) {
-        val rookInitialPosition = chessBoardManager.notationToPosition(rookStartingSquare)
-        val rookFinalPosition = chessBoardManager.notationToPosition(rookFinalSquare)
-        val rook = chessBoardManager.getPiece(rookInitialPosition)
+    private fun performCastle(king: King, kingFinalPosition: Position) {
+        val kingPosition = chessBoardManager.positionToNotation(kingFinalPosition)
+        val (rookStart, rookEnd) = when (kingPosition) {
+            "g1" -> "h1" to "f1"
+            "c1" -> "a1" to "d1"
+            "c8" -> "a8" to "d8"
+            "g8" -> "h8" to "f8"
+            else -> return
+        }
+
+        val rookStartPosition = chessBoardManager.notationToPosition(rookStart)
+        val rookFinalPosition = chessBoardManager.notationToPosition(rookEnd)
+        val rook = chessBoardManager.getPiece(rookStartPosition)
 
         if (rook is Rook && !rook.moved && rook.color == king.color) {
             rook.moved = true
-            val rookPieceView = pieceViews.find { it.currentPosition == rookInitialPosition }
+            val rookPieceView = pieceViews.find { it.currentPosition == rookStartPosition }
             if (rookPieceView != null) {
-                updatePieceLocation(rook, rookPieceView, rookInitialPosition, rookFinalPosition)
+                updatePieceLocation(rook, rookPieceView, rookStartPosition, rookFinalPosition)
             }
         }
     }
@@ -116,41 +125,7 @@ class ChessBoardController(
         if (currentPiece is King) {
             currentPiece.moved = true
             if (abs(finalPosition.col - currentPosition.col) == 2) {
-                val isKingSide = finalPosition.col > currentPosition.col
-                val isPrimaryLight = ChessBoardManager.primaryPlayerColor == Color.LIGHT
-                val kingColor = currentPiece.color
-
-                val (rookStart, rookEnd) = if (isKingSide) {
-                    if (isPrimaryLight) {
-                        if (kingColor == Color.LIGHT) {
-                            "h1" to "f1"
-                        } else {
-                            "h8" to "f8"
-                        }
-                    } else {
-                        if (kingColor == Color.LIGHT) {
-                            "a1" to "d1"
-                        } else {
-                            "a8" to "d8"
-                        }
-                    }
-                } else {
-                    if (isPrimaryLight) {
-                        if (kingColor == Color.LIGHT) {
-                            "a1" to "d1"
-                        } else {
-                            "a8" to "d8"
-                        }
-                    } else {
-                        if (kingColor == Color.LIGHT) {
-                            "h1" to "f1"
-                        } else {
-                            "h8" to "f8"
-                        }
-                    }
-                }
-
-                performCastle(currentPiece, rookStart, rookEnd)
+                performCastle(currentPiece, finalPosition)
             }
             when (GameState.currentPlayerColor) {
                 Color.LIGHT -> ChessBoardManager.lightKing =
