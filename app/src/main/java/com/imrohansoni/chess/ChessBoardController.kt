@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.imrohansoni.chess.models.Color
 import com.imrohansoni.chess.models.Move
+import com.imrohansoni.chess.models.PieceType
 import com.imrohansoni.chess.models.PieceView
 import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.models.opposite
@@ -13,6 +14,11 @@ import com.imrohansoni.chess.pieces.Piece
 import com.imrohansoni.chess.pieces.Rook
 import com.imrohansoni.chess.utils.CanvasInvalidator
 import com.imrohansoni.chess.utils.ChessBoardManager
+import com.imrohansoni.chess.utils.ChessBoardManager.Companion.boardState
+import com.imrohansoni.chess.utils.ChessBoardManager.Companion.darkKingPosition
+import com.imrohansoni.chess.utils.ChessBoardManager.Companion.files
+import com.imrohansoni.chess.utils.ChessBoardManager.Companion.lightKingPosition
+import com.imrohansoni.chess.utils.ChessBoardManager.Companion.ranks
 import com.imrohansoni.chess.utils.ChessPieceBitmapProvider
 import com.imrohansoni.chess.utils.Constants.boardRange
 import com.imrohansoni.chess.utils.SquareManager
@@ -26,7 +32,7 @@ class ChessBoardController(
     context: Context, private val invalidator: CanvasInvalidator
 ) {
     private val squareManager = SquareManager(context)
-    private var chessBoardManager = ChessBoardManager()
+    private var boardManager = ChessBoardManager()
 
     private val squareSize = squareManager.squareSize
     private val pieceBitmaps = ChessPieceBitmapProvider.getPieceBitmaps(context, squareSize)
@@ -40,7 +46,7 @@ class ChessBoardController(
     private fun initializePieceViews() {
         for (row in boardRange) {
             for (col in boardRange) {
-                chessBoardManager.getPiece(Position(row, col))?.let {
+                boardManager.getPiece(Position(row, col))?.let {
                     pieceBitmaps[it.fen]?.let { bitmap ->
                         val x = (squareSize * row).toFloat()
                         val y = (squareSize * col).toFloat()
@@ -54,7 +60,7 @@ class ChessBoardController(
 
     fun canMovePiece(): Boolean {
         GameState.selectedSquarePosition?.let {
-            val piece = chessBoardManager.getPiece(it)
+            val piece = boardManager.getPiece(it)
             return piece?.color == GameState.currentPlayerColor
         }
         return false
@@ -73,12 +79,12 @@ class ChessBoardController(
 
         pieceView.currentPosition = finalPosition
 
-        chessBoardManager.setPiece(currentPosition, null)
-        chessBoardManager.setPiece(finalPosition, piece)
+        boardManager.setPiece(currentPosition, null)
+        boardManager.setPiece(finalPosition, piece)
     }
 
     private fun performCastle(king: King, kingFinalPosition: Position) {
-        val kingPosition = chessBoardManager.positionToNotation(kingFinalPosition)
+        val kingPosition = positionToNotation(kingFinalPosition)
         val (rookStart, rookEnd) = when (kingPosition) {
             "g1" -> "h1" to "f1"
             "c1" -> "a1" to "d1"
@@ -87,9 +93,9 @@ class ChessBoardController(
             else -> return
         }
 
-        val rookStartPosition = chessBoardManager.notationToPosition(rookStart)
-        val rookFinalPosition = chessBoardManager.notationToPosition(rookEnd)
-        val rook = chessBoardManager.getPiece(rookStartPosition)
+        val rookStartPosition = notationToPosition(rookStart)
+        val rookFinalPosition = notationToPosition(rookEnd)
+        val rook = boardManager.getPiece(rookStartPosition)
 
         if (rook is Rook && !rook.moved && rook.color == king.color) {
             rook.moved = true
@@ -100,9 +106,146 @@ class ChessBoardController(
         }
     }
 
+    private fun isKingInCheck(kingColor: Color): Boolean {
+        val kingPosition = findKingPosition(kingColor)
+
+        for (row in boardRange) {
+            for (col in boardRange) {
+                val piece = boardManager.getPiece(Position(row, col))
+
+                if (piece != null && piece.color == kingColor.opposite() && piece.pieceType != PieceType.KING) {
+                    val possibleMoves = piece.calculatePossibleMoves(Position(row, col), boardState)
+                    if (possibleMoves.contains(kingPosition)) {
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
+    }
+
+    private fun canKingCastle(king: King): CastlingRight {
+        if (king.moved || isKingInCheck(king.color)) {
+            return CastlingRight(kingSide = false, queenSide = false)
+        }
+
+        val castlingRight = CastlingRight(kingSide = true, queenSide = true)
+
+        val (rookKingSidePosition, rookQueenSidePosition) = if (king.color == Color.LIGHT) {
+            Pair(notationToPosition("h1"), notationToPosition("a1"))
+        } else {
+            Pair(notationToPosition("h8"), notationToPosition("a8"))
+        }
+
+        val rookKingSide = boardManager.getPiece(rookKingSidePosition)
+        val rookQueenSide = boardManager.getPiece(rookQueenSidePosition)
+
+        if (rookKingSide !is Rook || rookKingSide.color != king.color || rookKingSide.moved) {
+            castlingRight.kingSide = false
+        }
+
+        if (rookQueenSide !is Rook || rookQueenSide.color != king.color || rookQueenSide.moved) {
+            castlingRight.queenSide = false
+        }
+
+        if (!castlingRight.kingSide && !castlingRight.queenSide) return castlingRight
+
+        val kingSidePieces =
+            if (king.color == Color.LIGHT) arrayOf("f1", "g1") else arrayOf("f8", "g8")
+        val queenSidePieces =
+            if (king.color == Color.LIGHT) arrayOf("b1", "c1", "d1") else arrayOf("b8", "c8", "d8")
+
+        for (piece in kingSidePieces) {
+            if (boardManager.getPiece(notationToPosition(piece)) != null) {
+                castlingRight.kingSide = false
+                break
+            }
+        }
+
+        for (piece in queenSidePieces) {
+            if (boardManager.getPiece(notationToPosition(piece)) != null) {
+                castlingRight.queenSide = false
+                break
+            }
+        }
+
+        if (!castlingRight.kingSide && !castlingRight.queenSide) return castlingRight
+
+        val kingPosition = findKingPosition(king.color)
+
+        for (position in kingSidePieces) {
+            if (!isSafeSquare(kingPosition, notationToPosition(position))
+            ) {
+                castlingRight.kingSide = false
+                break
+            }
+        }
+
+        for (position in queenSidePieces) {
+            if (!isSafeSquare(
+                    kingPosition,
+                    notationToPosition(position)
+                )
+            ) {
+                castlingRight.queenSide = false
+                break
+            }
+        }
+
+        return castlingRight
+    }
+
+    private fun findKingPosition(color: Color): Position {
+        return notationToPosition(if (color == Color.LIGHT) lightKingPosition else darkKingPosition)
+    }
+
+    private fun isSafeSquare(currentPosition: Position, movePosition: Position): Boolean {
+        var isValidMove = false
+        val currentPiece = boardManager.getPiece(currentPosition)
+        val capturedPiece = boardManager.getPiece(movePosition)
+
+        boardManager.setPiece(movePosition, currentPiece)
+        boardManager.setPiece(currentPosition, null)
+
+        if (currentPiece is King) {
+            if (currentPiece.color == Color.LIGHT) {
+                lightKingPosition = positionToNotation(movePosition)
+            } else {
+                darkKingPosition = positionToNotation(movePosition)
+            }
+        }
+
+        if (!isKingInCheck(currentPiece!!.color)) {
+            isValidMove = true
+        }
+
+        boardManager.setPiece(movePosition, capturedPiece)
+        boardManager.setPiece(currentPosition, currentPiece)
+
+        if (currentPiece is King) {
+            if (currentPiece.color == Color.LIGHT) {
+                lightKingPosition = positionToNotation(currentPosition)
+            } else {
+                darkKingPosition = positionToNotation(currentPosition)
+            }
+        }
+
+        return isValidMove
+    }
+
+    private fun notationToPosition(notation: String): Position {
+        val col = files.indexOf(notation[0])
+        val row = ranks.indexOf(notation[1])
+        return Position(row, col)
+    }
+
+    private fun positionToNotation(position: Position): String {
+        return "${files[position.col]}${ranks[position.row]}"
+    }
 
     fun movePiece(currentPosition: Position, finalPosition: Position): Move? {
-        val currentPiece = chessBoardManager.getPiece(currentPosition) ?: return null
+        val currentPiece = boardManager.getPiece(currentPosition) ?: return null
         val pieceView = pieceViews.find { piece -> piece.currentPosition == currentPosition }
 
         if (pieceView == null) return null
@@ -121,39 +264,41 @@ class ChessBoardController(
         squareManager.addSquare(currentPosition, lastMove = true)
         squareManager.addSquare(finalPosition, lastMove = true)
 
-        if (currentPiece is Pawn) currentPiece.moved = true
+        if (currentPiece is Pawn) {
+            if (!currentPiece.moved) currentPiece.moved = true
+        }
+
         if (currentPiece is King) {
-            currentPiece.moved = true
+            if (!currentPiece.moved) currentPiece.moved = true
             if (abs(finalPosition.col - currentPosition.col) == 2) {
                 performCastle(currentPiece, finalPosition)
             }
             when (GameState.currentPlayerColor) {
-                Color.LIGHT -> ChessBoardManager.lightKing =
-                    chessBoardManager.positionToNotation(finalPosition)
-
-                Color.DARK -> ChessBoardManager.darkKing =
-                    chessBoardManager.positionToNotation(finalPosition)
+                Color.LIGHT -> lightKingPosition = positionToNotation(finalPosition)
+                Color.DARK -> darkKingPosition = positionToNotation(finalPosition)
             }
         }
+
         if (currentPiece is Rook) currentPiece.moved = true
 
         val move = Move(
             startingPosition = currentPosition,
             finalPosition = finalPosition,
             capturedPieceColor = if (GameState.currentPlayerColor == Color.LIGHT) Color.DARK else Color.LIGHT,
-            algebraicNotation = chessBoardManager.positionToNotation(finalPosition),
+            algebraicNotation = positionToNotation(finalPosition),
             pieceView = pieceView,
             fen = currentPiece.fen,
-            capturePiece = capturedPieceView
+            capturePiece = capturedPieceView,
+            piece = currentPiece
         )
 
         GameState.undoStack.push(move)
 
         val currentPlayerColor = GameState.currentPlayerColor
         GameState.currentPlayerColor = currentPlayerColor.opposite()
-        val kingPosition = chessBoardManager.findKingPosition(currentPlayerColor)
+        val kingPosition = findKingPosition(currentPlayerColor)
 
-        if (chessBoardManager.isKingInCheck(currentPlayerColor)) {
+        if (isKingInCheck(currentPlayerColor)) {
             squareManager.addSquare(kingPosition, isChecked = true)
             isCheckmate()
         }
@@ -168,13 +313,13 @@ class ChessBoardController(
     private fun isCheckmate() {
         for (row in boardRange) {
             for (col in boardRange) {
-                val piece = ChessBoardManager.boardState[row][col]
+                val piece = boardState[row][col]
                 if (piece != null && piece.color == GameState.currentPlayerColor) {
                     val possibleMoves = piece.calculatePossibleMoves(
-                        Position(row, col), ChessBoardManager.boardState
+                        Position(row, col), boardState
                     )
                     possibleMoves.forEach {
-                        if (chessBoardManager.isSafeSquare(Position(row, col), it)) {
+                        if (isSafeSquare(Position(row, col), it)) {
                             return
                         }
                     }
@@ -239,41 +384,46 @@ class ChessBoardController(
 
         GameState.selectedSquarePosition = position
 
-        val selectedPiece = chessBoardManager.getPiece(position) ?: return
+        val selectedPiece = boardManager.getPiece(position) ?: return
         if (selectedPiece.color != GameState.currentPlayerColor) return
 
         var possibleSquares = selectedPiece
-            .calculatePossibleMoves(position, ChessBoardManager.boardState)
+            .calculatePossibleMoves(position, boardState)
             .toMutableList()
-
 
         squareManager.addSquare(position, isSelected = true)
 
         possibleSquares = possibleSquares.filter {
-            chessBoardManager.isSafeSquare(position, it)
+            isSafeSquare(position, it)
         }.toMutableList()
 
         if (selectedPiece is King) {
-            if (chessBoardManager.canCastle(selectedPiece).kingSide) {
-                possibleSquares.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "g1" else "g8"))
+            if (canKingCastle(selectedPiece).kingSide) {
+                possibleSquares.add(notationToPosition(if (selectedPiece.color == Color.LIGHT) "g1" else "g8"))
             }
 
-            if (chessBoardManager.canCastle(selectedPiece).queenSide) {
-                possibleSquares.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "c1" else "c8"))
+            if (canKingCastle(selectedPiece).queenSide) {
+                possibleSquares.add(notationToPosition(if (selectedPiece.color == Color.LIGHT) "c1" else "c8"))
             }
+        }
+
+        if (selectedPiece is Pawn) {
+            if (selectedPiece.moved) selectedPiece.moved = false
         }
 
         GameState.safeSquares = possibleSquares
 
         GameState.safeSquares.forEach {
             val safeSquare = squareManager.addSquare(it, isSafeSquare = true)
-            if (chessBoardManager.getPiece(it) != null) {
+            if (boardManager.getPiece(it) != null) {
                 safeSquare.canBeCaptured = true
             }
         }
 
         invalidator.canvasInvalidator()
     }
+
+
 
     fun resetSelection() {
         squareManager.resetSelectedSquare()
