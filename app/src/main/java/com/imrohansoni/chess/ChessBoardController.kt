@@ -9,6 +9,7 @@ import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.models.opposite
 import com.imrohansoni.chess.pieces.King
 import com.imrohansoni.chess.pieces.Pawn
+import com.imrohansoni.chess.pieces.Piece
 import com.imrohansoni.chess.pieces.Rook
 import com.imrohansoni.chess.utils.CanvasInvalidator
 import com.imrohansoni.chess.utils.ChessBoardManager
@@ -16,11 +17,13 @@ import com.imrohansoni.chess.utils.ChessPieceBitmapProvider
 import com.imrohansoni.chess.utils.Constants.boardRange
 import com.imrohansoni.chess.utils.SquareManager
 import com.imrohansoni.chess.utils.animatePieceMovement
+import kotlin.math.abs
+
 
 data class CastlingRight(var kingSide: Boolean, var queenSide: Boolean)
 
 class ChessBoardController(
-    private val context: Context, private val invalidator: CanvasInvalidator
+    context: Context, private val invalidator: CanvasInvalidator
 ) {
     private val squareManager = SquareManager(context)
     private var chessBoardManager = ChessBoardManager()
@@ -57,20 +60,12 @@ class ChessBoardController(
         return false
     }
 
-    fun movePiece(currentPosition: Position, finalPosition: Position): Move? {
-        val currentPiece = chessBoardManager.getPiece(currentPosition)
-
-        val pieceView = pieceViews.find { piece -> piece.currentPosition == currentPosition }
-        val capturedPieceView =
-            pieceViews.find { piece -> piece.currentPosition == finalPosition }
-
-        if (capturedPieceView != null) {
-            pieceViews.remove(capturedPieceView)
-        }
-
-        if (pieceView == null || currentPiece == null) {
-            return null
-        }
+    private fun updatePieceLocation(
+        piece: Piece,
+        pieceView: PieceView,
+        currentPosition: Position,
+        finalPosition: Position
+    ) {
 
         animatePieceMovement(
             pieceView, finalPosition, squareSize, invalidator
@@ -79,7 +74,37 @@ class ChessBoardController(
         pieceView.currentPosition = finalPosition
 
         chessBoardManager.setPiece(currentPosition, null)
-        chessBoardManager.setPiece(finalPosition, currentPiece)
+        chessBoardManager.setPiece(finalPosition, piece)
+    }
+
+    private fun performCastle(king: King, rookStartingSquare: String, rookFinalSquare: String) {
+        val rookInitialPosition = chessBoardManager.notationToPosition(rookStartingSquare)
+        val rookFinalPosition = chessBoardManager.notationToPosition(rookFinalSquare)
+        val rook = chessBoardManager.getPiece(rookInitialPosition)
+
+        if (rook is Rook && !rook.moved && rook.color == king.color) {
+            rook.moved = true
+            val rookPieceView = pieceViews.find { it.currentPosition == rookInitialPosition }
+            if (rookPieceView != null) {
+                updatePieceLocation(rook, rookPieceView, rookInitialPosition, rookFinalPosition)
+            }
+        }
+    }
+
+
+    fun movePiece(currentPosition: Position, finalPosition: Position): Move? {
+        val currentPiece = chessBoardManager.getPiece(currentPosition) ?: return null
+        val pieceView = pieceViews.find { piece -> piece.currentPosition == currentPosition }
+
+        if (pieceView == null) return null
+
+        val capturedPieceView = pieceViews.find { piece -> piece.currentPosition == finalPosition }
+
+        capturedPieceView?.let {
+            pieceViews.remove(it)
+        }
+
+        updatePieceLocation(currentPiece, pieceView, currentPosition, finalPosition)
 
         squareManager.resetSquareFlags()
         squareManager.resetCheckSquareFlag()
@@ -90,6 +115,43 @@ class ChessBoardController(
         if (currentPiece is Pawn) currentPiece.moved = true
         if (currentPiece is King) {
             currentPiece.moved = true
+            if (abs(finalPosition.col - currentPosition.col) == 2) {
+                val isKingSide = finalPosition.col > currentPosition.col
+                val isPrimaryLight = ChessBoardManager.primaryPlayerColor == Color.LIGHT
+                val kingColor = currentPiece.color
+
+                val (rookStart, rookEnd) = if (isKingSide) {
+                    if (isPrimaryLight) {
+                        if (kingColor == Color.LIGHT) {
+                            "h1" to "f1"
+                        } else {
+                            "h8" to "f8"
+                        }
+                    } else {
+                        if (kingColor == Color.LIGHT) {
+                            "a1" to "d1"
+                        } else {
+                            "a8" to "d8"
+                        }
+                    }
+                } else {
+                    if (isPrimaryLight) {
+                        if (kingColor == Color.LIGHT) {
+                            "a1" to "d1"
+                        } else {
+                            "a8" to "d8"
+                        }
+                    } else {
+                        if (kingColor == Color.LIGHT) {
+                            "h1" to "f1"
+                        } else {
+                            "h8" to "f8"
+                        }
+                    }
+                }
+
+                performCastle(currentPiece, rookStart, rookEnd)
+            }
             when (GameState.currentPlayerColor) {
                 Color.LIGHT -> ChessBoardManager.lightKing =
                     chessBoardManager.positionToNotation(finalPosition)
@@ -196,7 +258,6 @@ class ChessBoardController(
         )
     }
 
-
     fun selectSquare(position: Position) {
         if (!GameState.redoStack.empty()) return
         squareManager.resetSelectedSquare()
@@ -206,24 +267,28 @@ class ChessBoardController(
         val selectedPiece = chessBoardManager.getPiece(position) ?: return
         if (selectedPiece.color != GameState.currentPlayerColor) return
 
-        val availableSquares = selectedPiece
+        var possibleSquares = selectedPiece
             .calculatePossibleMoves(position, ChessBoardManager.boardState)
-            .toList()
+            .toMutableList()
+
 
         squareManager.addSquare(position, isSelected = true)
 
-        GameState.safeSquares = availableSquares.filter {
+        possibleSquares = possibleSquares.filter {
             chessBoardManager.isSafeSquare(position, it)
+        }.toMutableList()
+
+        if (selectedPiece is King) {
+            if (chessBoardManager.canCastle(selectedPiece).kingSide) {
+                possibleSquares.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "g1" else "g8"))
+            }
+
+            if (chessBoardManager.canCastle(selectedPiece).queenSide) {
+                possibleSquares.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "c1" else "c8"))
+            }
         }
 
-//        if (selectedPiece is King) {
-//            if (chessBoardManager.canCastle(selectedPiece).kingSide) {
-//                availableSquares?.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "g1" else "g8"))
-//            }
-//            if (chessBoardManager.canCastle(selectedPiece).queenSide) {
-//                availableSquares?.add(chessBoardManager.notationToPosition(if (selectedPiece.color == Color.LIGHT) "c1" else "c8"))
-//            }
-//        }
+        GameState.safeSquares = possibleSquares
 
         GameState.safeSquares.forEach {
             val safeSquare = squareManager.addSquare(it, isSafeSquare = true)
