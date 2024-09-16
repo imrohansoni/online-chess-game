@@ -1,14 +1,9 @@
 package com.imrohansoni.chess.pieces
 
-import android.graphics.Bitmap
-import com.imrohansoni.chess.models.Type
-import com.imrohansoni.chess.models.Position
 import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.Type
 
-class Queen(override val color: Color,
-            override var currentPosition: Position,
-            override val bitmap: Bitmap
-) : Piece {
+class Queen(override val color: Color) : Piece {
     override val type = Type.QUEEN
     override val directions = arrayOf(
         Pair(1, 1), Pair(-1, -1),

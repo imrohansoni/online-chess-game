@@ -1,14 +1,10 @@
 package com.imrohansoni.chess.pieces
 
-import android.graphics.Bitmap
+
 import com.imrohansoni.chess.models.Color
 import com.imrohansoni.chess.models.Type
-import com.imrohansoni.chess.models.Position
 
-
-class Rook(override val color: Color,
-           override var currentPosition: Position,
-           override val bitmap: Bitmap
+class Rook(override val color: Color
 ) : Piece {
     var moved = false
     override val type = Type.ROOK

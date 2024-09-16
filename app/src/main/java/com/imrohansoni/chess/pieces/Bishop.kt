@@ -1,14 +1,10 @@
 package com.imrohansoni.chess.pieces
 
-import android.graphics.Bitmap
 import com.imrohansoni.chess.models.Color
 import com.imrohansoni.chess.models.Type
-import com.imrohansoni.chess.models.Position
 
 class Bishop(
-    override val color: Color,
-    override var currentPosition: Position,
-    override val bitmap: Bitmap
+    override val color: Color
 ) : Piece {
     override val type = Type.BISHOP
     override val directions = arrayOf(

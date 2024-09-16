@@ -8,9 +8,7 @@ import com.imrohansoni.chess.utils.ChessBoardManager
 
 
 class Pawn(
-    override val color: Color,
-    override var currentPosition: Position,
-    override val bitmap: Bitmap
+    override val color: Color
 ) : Piece {
     var moved = false
     override var fen = if (color == Color.LIGHT) "P" else "p"
