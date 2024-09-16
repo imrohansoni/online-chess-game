@@ -1,20 +1,21 @@
 package com.imrohansoni.chess.pieces
 
-import com.imrohansoni.chess.models.PieceType
-import com.imrohansoni.chess.models.Position
+import android.graphics.Bitmap
 import com.imrohansoni.chess.models.Color
+import com.imrohansoni.chess.models.Type
+import com.imrohansoni.chess.models.Position
 
-typealias BoardState = Array<Array<Piece?>>
-
+typealias Directions = Array<Pair<Int, Int>>
 
 interface Piece {
-    val pieceType: PieceType
-    val color: Color
-    val directions: Array<Pair<Int, Int>>
-    var fen: String
+    operator fun component1() = color
+    operator fun component2() = directions
+    operator fun component3() = currentPosition
 
-    fun calculatePossibleMoves(
-        currentPosition: Position,
-        boardState: BoardState
-    ): Array<Position>
+    val type: Type
+    val color: Color
+    var fen: String
+    val directions: Directions
+    var currentPosition: Position
+    val bitmap: Bitmap
 }

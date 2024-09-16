@@ -1,13 +1,17 @@
 package com.imrohansoni.chess.pieces
 
+import android.graphics.Bitmap
 import com.imrohansoni.chess.models.Color
-import com.imrohansoni.chess.models.PieceType
+import com.imrohansoni.chess.models.Type
 import com.imrohansoni.chess.models.Position
-import com.imrohansoni.chess.utils.Constants.boardRange
 
 
-class Knight(override val color: Color) : Piece {
-    override val pieceType = PieceType.KNIGHT
+class Knight(
+    override val color: Color,
+    override var currentPosition: Position,
+    override val bitmap: Bitmap
+) : Piece {
+    override val type = Type.KNIGHT
 
     override val directions = arrayOf(
         Pair(-2, -1), Pair(-1, -2), Pair(-2, 1), Pair(-1, 2),
@@ -15,25 +19,4 @@ class Knight(override val color: Color) : Piece {
     )
 
     override var fen = if (color == Color.LIGHT) "N" else "n"
-
-
-    override fun calculatePossibleMoves(
-        currentPosition: Position,
-        boardState: BoardState
-    ): Array<Position> {
-        val availableSquares = mutableListOf<Position>()
-        directions.forEach {
-            val row = currentPosition.row + it.first
-            val col = currentPosition.col + it.second
-
-            if (row in boardRange && col in boardRange) {
-                val targetPiece = boardState[row][col]
-                if (targetPiece == null || targetPiece.color != color
-                ) {
-                    availableSquares.add(Position(row, col))
-                }
-            }
-        }
-        return availableSquares.toTypedArray()
-    }
 }

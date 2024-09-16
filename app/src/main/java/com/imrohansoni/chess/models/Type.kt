@@ -1,6 +1,6 @@
 package com.imrohansoni.chess.models
 
-enum class Piece {
+enum class PieceType {
     PAWN,
     KNIGHT,
     BISHOP,
