@@ -252,6 +252,25 @@ class ChessBoardController(
         GameManager.moves.add(move)
         GameManager.currentMovePosition++
         chessBoardHandler.pieceMoveHandler(move)
+
+        if (piece.color == Color.DARK) GameManager.fullMoves++
+
+        val currentFen = convertPositionToFEN()
+        val boardPositionFen = currentFen.split(" ").first()
+
+        val appearanceCount = GameManager.boardPositionFenMap[boardPositionFen] ?: 0
+
+        val updatedCount = appearanceCount + 1
+        GameManager.boardPositionFenMap[boardPositionFen] = updatedCount
+
+        if (updatedCount == 3) {
+            GameManager.gameState = GameState.FINISHED
+            Log.d("CHESS_BOARD_GAME", "three fold repetition")
+        }
+
+
+
+
         val currentPlayerColor = GameManager.currentPlayerColor
 
         val kingPosition = findKingPosition(currentPlayerColor.opposite())
@@ -679,5 +698,66 @@ class ChessBoardController(
         GameManager.selectedSquarePosition = null
         GameManager.safeSquares = listOf()
         invalidator.invalidateCanvas()
+    }
+
+    private fun convertPositionToFEN() = buildString {
+        val boardRange =
+            if (ChessBoardManager.primaryPlayerColor == Color.LIGHT) 0..7 else 7 downTo 0
+
+        for (row in boardRange) {
+            var consecutiveBlankSquare = 0
+            for (col in boardRange) {
+                val piece = boardMatrix[row][col]
+                if (piece == null) {
+                    consecutiveBlankSquare++
+                    continue
+                }
+                if (consecutiveBlankSquare == 0) {
+                    append(piece.fen)
+                } else {
+                    append(consecutiveBlankSquare)
+                    append(piece.fen)
+                    consecutiveBlankSquare = 0
+                }
+            }
+            if (consecutiveBlankSquare != 0) {
+                append(consecutiveBlankSquare)
+            }
+            if (row != boardRange.last) {
+                append("/")
+            }
+        }
+
+        append(" ")
+        if (GameManager.currentPlayerColor == Color.LIGHT) append("b") else append("w")
+
+        append(" ")
+        val castlingRightLight = hasCastlingRights(GameManager.currentPlayerColor)
+        val castlingRightDark = hasCastlingRights(GameManager.currentPlayerColor.opposite())
+
+        if (castlingRightLight.kingSide) append("K")
+        if (castlingRightLight.queenSide) append("Q")
+        if (castlingRightDark.kingSide) append("k")
+        if (castlingRightDark.queenSide) append("q")
+
+        if (!castlingRightLight.kingSide && !castlingRightLight.queenSide && !castlingRightDark.kingSide && !castlingRightDark.queenSide)
+            append("-")
+
+        append(" ")
+
+        if (GameManager.moves.size > 0) {
+            val (piece, startingPosition, finalPosition, algebraicNotation) = GameManager.moves.last()
+
+            if (piece is Pawn && abs(startingPosition.row - finalPosition.row) == 2) {
+                append(algebraicNotation)
+            } else {
+                append("-")
+            }
+        }
+
+        append(" ")
+        append(GameManager.halfMoves)
+        append(" ")
+        append(GameManager.fullMoves)
     }
 }
